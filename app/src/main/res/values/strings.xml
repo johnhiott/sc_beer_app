@@ -4,5 +4,9 @@
     <string name="app_name">Sunday Funday</string>
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
-
+    <array name="nav_options">
+        <item>All</item>
+        <item>Stores</item>
+        <item>Restaurants/Bars</item>
+    </array>
 </resources>
