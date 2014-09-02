@@ -1,13 +1,16 @@
 package com.johnhiott.sundayfunday;
 
-import android.content.Context;
 import android.content.res.Configuration;
 import android.support.v4.app.ActionBarDrawerToggle;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
+
+import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import android.location.Location;
 import android.support.v4.widget.DrawerLayout;
@@ -34,14 +37,9 @@ public class MainActivity extends FragmentActivity implements
       GooglePlayServicesClient.ConnectionCallbacks,
       GooglePlayServicesClient.OnConnectionFailedListener {
 
-  private Location mLocation;
   private LocationClient mLocationClient;
   private GoogleMap mMap;
-  private OkHttpClient mOkHttpClient;
-  private Context mContext;
-  private String mResponse;
-  private Place[] places;
-  private Gson gson;
+  private Place[] mPlaces;
   private String[] navTitles;
   private ListView mDrawerList;
   private ActionBarDrawerToggle mDrawerToggle;
@@ -58,8 +56,6 @@ public class MainActivity extends FragmentActivity implements
 
     mTitle = getTitle();
     mDrawerTitle = "Select Type of Location";
-
-    mContext = getApplicationContext();
 
     navTitles = getResources().getStringArray(R.array.nav_options);
 
@@ -140,7 +136,6 @@ public class MainActivity extends FragmentActivity implements
     return true;
   }
 
-
   @Override
   public void onConnected(Bundle bundle) {
 
@@ -152,8 +147,12 @@ public class MainActivity extends FragmentActivity implements
     mMap = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map))
           .getMap();
 
-    gson = new Gson();
-    ApiRequest apiRequest = new ApiRequest();
+    mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+      @Override
+      public boolean onMarkerClick(Marker marker) {
+        return false;
+      }
+    });
 
     OkHttpClient okHttpClient = new OkHttpClient();
 
@@ -173,18 +172,19 @@ public class MainActivity extends FragmentActivity implements
 
       @Override
       public void onResponse(Response response) throws IOException {
-        mResponse = response.body().string();
-        places = gson.fromJson(mResponse, Place[].class);
-
+        Gson gson = new Gson();
+        mPlaces = gson.fromJson(response.body().string(), Place[].class);
         runOnUiThread(new Runnable() {
           public void run() {
-            int count = places.length;
-            for (int x=0; x<count; x++){
+            LatLngBounds.Builder builder = new LatLngBounds.Builder();
 
-              LatLng latLng = new LatLng(places[x].getLat(), places[x].getLon());
-              mMap.addMarker(new MarkerOptions().position(latLng).title(places[x].getName()));
-
+            for (Place place : mPlaces ){
+              LatLng latLng = new LatLng(place.getLat(), place.getLon());
+              builder.include(latLng);
+              mMap.addMarker(new MarkerOptions().position(latLng).title(place.getName()));
             }
+            LatLngBounds latLngBounds = builder.build();
+            mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(latLngBounds, 1));
           }
         });
       }
