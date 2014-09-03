@@ -10,4 +10,8 @@
         <item>Stores</item>
         <item>Restaurants/Bars</item>
     </array>
+    <array name="tab_titles">
+        <item>Map</item>
+        <item>List</item>
+    </array>
 </resources>

@@ -1,19 +1,23 @@
 package com.johnhiott.sundayfunday;
 
+import android.app.ActionBar;
+import android.app.Activity;
+import android.app.Fragment;
+import android.app.FragmentManager;
+import android.app.FragmentTransaction;
 import android.content.res.Configuration;
 import android.support.v4.app.ActionBarDrawerToggle;
-import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import android.location.Location;
 import android.support.v4.widget.DrawerLayout;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -24,6 +28,8 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesClient;
 import com.google.android.gms.location.LocationClient;
 import com.google.gson.Gson;
+import com.johnhiott.sundayfunday.fragments.CustomMapFragment;
+import com.johnhiott.sundayfunday.fragments.ListFragment;
 import com.johnhiott.sundayfunday.models.Place;
 import com.squareup.okhttp.Call;
 import com.squareup.okhttp.Callback;
@@ -33,7 +39,7 @@ import com.squareup.okhttp.Response;
 
 import java.io.IOException;
 
-public class MainActivity extends FragmentActivity implements
+public class MainActivity extends Activity implements
       GooglePlayServicesClient.ConnectionCallbacks,
       GooglePlayServicesClient.OnConnectionFailedListener {
 
@@ -45,7 +51,9 @@ public class MainActivity extends FragmentActivity implements
   private ActionBarDrawerToggle mDrawerToggle;
   private CharSequence mDrawerTitle;
   private CharSequence mTitle;
-
+  private CharSequence[] mTabTitles;
+  private static final int PAGE_COUNT = 2;
+  private Fragment currentFragment;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -128,7 +136,6 @@ public class MainActivity extends FragmentActivity implements
     return super.onOptionsItemSelected(item);
   }
 
-
   @Override
   public boolean onCreateOptionsMenu(Menu menu) {
     // Inflate the menu; this adds items to the action bar if it is present.
@@ -144,16 +151,6 @@ public class MainActivity extends FragmentActivity implements
     double currentLat = location.getLatitude();
     double currentLon = location.getLongitude();
 
-    mMap = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map))
-          .getMap();
-
-    mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
-      @Override
-      public boolean onMarkerClick(Marker marker) {
-        return false;
-      }
-    });
-
     OkHttpClient okHttpClient = new OkHttpClient();
 
     String url = "http://johnhiott.com/sundayfunday/locations.php?lat=" + currentLat + "&lon=" + currentLon;
@@ -167,24 +164,20 @@ public class MainActivity extends FragmentActivity implements
     call.enqueue(new Callback() {
       @Override
       public void onFailure(Request request, IOException e) {
-
+        //TODO: some kind of error handling goes here
       }
 
+      /*
+        Once network request is complete, setup the tabs
+       */
       @Override
       public void onResponse(Response response) throws IOException {
         Gson gson = new Gson();
-        mPlaces = gson.fromJson(response.body().string(), Place[].class);
+        MainApplication application = (MainApplication)getApplication();
+        application.setPlaces( gson.fromJson(response.body().string(), Place[].class) );
         runOnUiThread(new Runnable() {
           public void run() {
-            LatLngBounds.Builder builder = new LatLngBounds.Builder();
-
-            for (Place place : mPlaces ){
-              LatLng latLng = new LatLng(place.getLat(), place.getLon());
-              builder.include(latLng);
-              mMap.addMarker(new MarkerOptions().position(latLng).title(place.getName()));
-            }
-            LatLngBounds latLngBounds = builder.build();
-            mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(latLngBounds, 1));
+            setupTabs(mPlaces);
           }
         });
       }
@@ -199,5 +192,80 @@ public class MainActivity extends FragmentActivity implements
   @Override
   public void onConnectionFailed(ConnectionResult connectionResult) {
 
+  }
+
+  public void setupTabs(Place[] places){
+
+    final ActionBar actionBar = getActionBar();
+    mTabTitles = getResources().getStringArray(R.array.tab_titles);
+
+    actionBar.setNavigationMode(ActionBar.NAVIGATION_MODE_TABS);
+
+    ActionBar.TabListener tabListener = new ActionBar.TabListener() {
+      @Override
+      public void onTabSelected(ActionBar.Tab tab, FragmentTransaction fragmentTransaction) {
+        //TODO: store these keys in resources or as const
+        switch (tab.getPosition()){
+          case 0:
+             changeFragment("map");
+             break;
+          case 1:
+            changeFragment("list");
+            break;
+        }
+      }
+
+      @Override
+      public void onTabUnselected(ActionBar.Tab tab, android.app.FragmentTransaction fragmentTransaction) {
+
+      }
+
+      @Override
+      public void onTabReselected(ActionBar.Tab tab, android.app.FragmentTransaction fragmentTransaction) {
+
+      }
+
+    };
+
+    for (int x=0; x<PAGE_COUNT; x++){
+      actionBar.addTab(actionBar.newTab()
+            .setText(mTabTitles[x])
+            .setTabListener(tabListener)
+      );
+    }
+  }
+
+  /*
+    Use the fragmentmanager to handle switching between tabs.
+   */
+  public void changeFragment(String tag){
+
+    Fragment tmpFragment;
+    FragmentTransaction fragmentTransaction = getFragmentManager().beginTransaction();
+
+    //look to see if we have already added the fragment
+    tmpFragment = getFragmentManager().findFragmentByTag(tag);
+
+    //we currently have a fragment, hide it
+    if (currentFragment != null){
+      fragmentTransaction.detach(currentFragment);
+    }
+
+    //did not find the fragment
+    if (tmpFragment == null){
+      if (tag.equals("map")){
+        currentFragment = CustomMapFragment.newInstance();
+      } else if (tag.equals("list")){
+        currentFragment = ListFragment.newInstance();
+      }else {
+        //TODO
+      }
+      fragmentTransaction.add(R.id.content_frame, currentFragment, tag); //add fragment for 1st time
+    } else {
+      //we found the fragment
+      currentFragment = tmpFragment;
+      fragmentTransaction.attach(currentFragment);  //show the fragment we found
+    }
+    fragmentTransaction.commit();
   }
 }
