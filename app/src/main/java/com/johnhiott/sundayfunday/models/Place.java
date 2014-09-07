@@ -4,6 +4,9 @@ import java.io.Serializable;
 
 public class Place implements Serializable {
 
+  public final static String STORE_TYPE = "7 DAY BEER/WINE OFF PREMISES CONSUMPTION";
+  public final static String RESTAURANT_BAR_TYPE = "LOCAL OPTION PERMIT";
+
   private String name;
   private String address;
   private double lat;
