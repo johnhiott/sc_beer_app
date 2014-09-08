@@ -1,11 +1,6 @@
 package com.johnhiott.sundayfunday.fragments;
 
 import android.os.Bundle;
-import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
-
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
@@ -32,11 +27,26 @@ public class CustomMapFragment extends MapFragment {
   @Override
   public void onActivityCreated(Bundle savedInstanceState) {
     super.onActivityCreated(savedInstanceState);
+
+  }
+
+  public static CustomMapFragment newInstance() {
+    CustomMapFragment fragment = new CustomMapFragment();
+    return fragment;
+  }
+
+  public void setupMap(){
+
+    //clear the map first
+    getMap().clear();
+
+    //get the places
     MainApplication application = (MainApplication)getActivity().getApplication();
     Place[] places = application.getPlaces();
 
     builder = new LatLngBounds.Builder();
 
+    //add markers, setup lat,long bounds
     for (Place place : places ){
       LatLng latLng = new LatLng(place.getLat(), place.getLon());
       builder.include(latLng);
@@ -54,11 +64,6 @@ public class CustomMapFragment extends MapFragment {
         }
       }
     });
-  }
-
-  public static CustomMapFragment newInstance() {
-    CustomMapFragment fragment = new CustomMapFragment();
-    return fragment;
   }
 
 }

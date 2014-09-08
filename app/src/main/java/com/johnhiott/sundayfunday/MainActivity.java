@@ -3,21 +3,15 @@ package com.johnhiott.sundayfunday;
 import android.app.ActionBar;
 import android.app.Activity;
 import android.app.Fragment;
-import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.res.Configuration;
 import android.support.v4.app.ActionBarDrawerToggle;
 import android.os.Bundle;
 
-import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.LatLngBounds;
-import com.google.android.gms.maps.model.Marker;
-import com.google.android.gms.maps.model.MarkerOptions;
+
 import android.location.Location;
 import android.support.v4.widget.DrawerLayout;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -28,8 +22,8 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesClient;
 import com.google.android.gms.location.LocationClient;
 import com.google.gson.Gson;
+import com.johnhiott.sundayfunday.fragments.CustomListFragment;
 import com.johnhiott.sundayfunday.fragments.CustomMapFragment;
-import com.johnhiott.sundayfunday.fragments.ListFragment;
 import com.johnhiott.sundayfunday.models.Place;
 import com.squareup.okhttp.Call;
 import com.squareup.okhttp.Callback;
@@ -109,6 +103,8 @@ public class MainActivity extends Activity implements
     mLocationClient = new LocationClient(this,this,this);
     mLocationClient.connect();
 
+    setupTabs();
+
   }
 
   @Override
@@ -168,7 +164,7 @@ public class MainActivity extends Activity implements
       }
 
       /*
-        Once network request is complete, setup the tabs
+        Once network request is complete, add markers to map
        */
       @Override
       public void onResponse(Response response) throws IOException {
@@ -176,8 +172,10 @@ public class MainActivity extends Activity implements
         MainApplication application = (MainApplication)getApplication();
         application.setPlaces( gson.fromJson(response.body().string(), Place[].class) );
         runOnUiThread(new Runnable() {
+          @Override
           public void run() {
-            setupTabs(mPlaces);
+            CustomMapFragment customMapFragment = (CustomMapFragment)getFragmentManager().findFragmentByTag("map");
+            customMapFragment.setupMap();
           }
         });
       }
@@ -194,7 +192,7 @@ public class MainActivity extends Activity implements
 
   }
 
-  public void setupTabs(Place[] places){
+  public void setupTabs(){
 
     final ActionBar actionBar = getActionBar();
     mTabTitles = getResources().getStringArray(R.array.tab_titles);
@@ -256,7 +254,7 @@ public class MainActivity extends Activity implements
       if (tag.equals("map")){
         currentFragment = CustomMapFragment.newInstance();
       } else if (tag.equals("list")){
-        currentFragment = ListFragment.newInstance();
+        currentFragment = CustomListFragment.newInstance();
       }else {
         //TODO
       }
