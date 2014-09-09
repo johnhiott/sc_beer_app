@@ -12,9 +12,11 @@ import com.google.android.gms.maps.GoogleMap;
 
 import android.location.Location;
 import android.support.v4.widget.DrawerLayout;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
@@ -37,9 +39,12 @@ public class MainActivity extends Activity implements
       GooglePlayServicesClient.ConnectionCallbacks,
       GooglePlayServicesClient.OnConnectionFailedListener {
 
+
+  public final static int LOCATIONS_ALL = 0;
+  public final static int LOCATION_STORE = 1;
+  public final static int LOCATION_BAR = 2 ;
+
   private LocationClient mLocationClient;
-  private GoogleMap mMap;
-  private Place[] mPlaces;
   private String[] navTitles;
   private ListView mDrawerList;
   private ActionBarDrawerToggle mDrawerToggle;
@@ -48,6 +53,9 @@ public class MainActivity extends Activity implements
   private CharSequence[] mTabTitles;
   private static final int PAGE_COUNT = 2;
   private Fragment currentFragment;
+  private Location mLocation;
+  private int mLocationType;
+  private DrawerLayout mDrawerLayout;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -56,12 +64,25 @@ public class MainActivity extends Activity implements
 
     //TODO: lot's of error handling for locations and play services missing
 
+    mLocationType = MainActivity.LOCATIONS_ALL; //TODO:move to config
+    mDrawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
+
     mTitle = getTitle();
     mDrawerTitle = "Select Type of Location";
 
     navTitles = getResources().getStringArray(R.array.nav_options);
 
     mDrawerList = (ListView) findViewById(R.id.left_drawer);
+
+    mDrawerList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+      @Override
+      public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+        mLocationType = i;
+        mDrawerLayout.closeDrawer(mDrawerList);
+        makeNetworkCall();
+
+      }
+    });
 
     // Set the adapter for the list view
     mDrawerList.setAdapter(new ArrayAdapter<String>(this,
@@ -142,44 +163,12 @@ public class MainActivity extends Activity implements
   @Override
   public void onConnected(Bundle bundle) {
 
-    Location location = mLocationClient.getLastLocation();
+    //TODO: handling no location
+    Log.v("HIOTTJOHN", "Location Services Connected");
+    mLocation = mLocationClient.getLastLocation();
 
-    double currentLat = location.getLatitude();
-    double currentLon = location.getLongitude();
+    makeNetworkCall();
 
-    OkHttpClient okHttpClient = new OkHttpClient();
-
-    String url = "http://johnhiott.com/sundayfunday/locations.php?lat=" + currentLat + "&lon=" + currentLon;
-
-    Request request = new Request.Builder()
-          .url(url)
-          .build();
-
-    Call call = okHttpClient.newCall(request);
-
-    call.enqueue(new Callback() {
-      @Override
-      public void onFailure(Request request, IOException e) {
-        //TODO: some kind of error handling goes here
-      }
-
-      /*
-        Once network request is complete, add markers to map
-       */
-      @Override
-      public void onResponse(Response response) throws IOException {
-        Gson gson = new Gson();
-        MainApplication application = (MainApplication)getApplication();
-        application.setPlaces( gson.fromJson(response.body().string(), Place[].class) );
-        runOnUiThread(new Runnable() {
-          @Override
-          public void run() {
-            CustomMapFragment customMapFragment = (CustomMapFragment)getFragmentManager().findFragmentByTag("map");
-            customMapFragment.setupMap();
-          }
-        });
-      }
-    });
   }
 
   @Override
@@ -266,4 +255,70 @@ public class MainActivity extends Activity implements
     }
     fragmentTransaction.commit();
   }
+
+
+  private String buildUrl(){
+
+    double currentLat = mLocation.getLatitude();
+    double currentLon = mLocation.getLongitude();
+
+    //temp stuff
+    currentLat = 34.9883880;
+    currentLon = -81.2377340;
+
+    String baseUrl = "http://johnhiott.com/sundayfunday/locations.php?lat=" + currentLat + "&lon=" + currentLon;
+
+    switch (mLocationType){
+      case LOCATIONS_ALL:
+        return baseUrl;
+      case LOCATION_BAR:
+        return baseUrl + "&type=bar";
+      case LOCATION_STORE:
+        return baseUrl + "&type=store";
+    }
+    return baseUrl;
+  }
+
+  private void makeNetworkCall(){
+    OkHttpClient okHttpClient = new OkHttpClient();
+
+    String url = buildUrl();
+
+    Request request = new Request.Builder()
+          .url(url)
+          .build();
+
+    Call call = okHttpClient.newCall(request);
+
+    call.enqueue(new Callback() {
+      @Override
+      public void onFailure(Request request, IOException e) {
+        Log.e("Network Call", "Network call failed");
+      }
+
+      /*
+        Once network request is complete, add markers to map
+       */
+      @Override
+      public void onResponse(Response response) throws IOException {
+        Log.v ("HIOTTJOHN", "Network response");
+        Gson gson = new Gson();
+        MainApplication application = (MainApplication)getApplication();
+        application.setPlaces( gson.fromJson(response.body().string(), Place[].class) );
+        runOnUiThread(new Runnable() {
+          @Override
+          public void run() {
+            CustomMapFragment customMapFragment = (CustomMapFragment)getFragmentManager().findFragmentByTag("map");
+            if (customMapFragment != null)  //make sure fragment is there
+              customMapFragment.setupMap();
+
+            CustomListFragment listFragment = (CustomListFragment)getFragmentManager().findFragmentByTag("list");
+            if (listFragment != null)   //make sure the fragment is there
+              listFragment.setAdapter();
+          }
+        });
+      }
+    });
+  }
+
 }
